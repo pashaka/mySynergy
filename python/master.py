@@ -65,10 +65,32 @@ async def run_master(host, port, edge_threshold=2, poll_interval=0.016):
             msg = {"type": "mouseclick", "button": btn, "down": pressed}
             asyncio.get_event_loop().create_task(ws.send(json.dumps(msg)))
 
+        # Use a queue for outgoing events so listener threads can safely enqueue
+        out_q = asyncio.Queue()
+
+        def enqueue(msg):
+            try:
+                loop = asyncio.get_running_loop()
+                # if called from event loop thread
+                loop.create_task(ws.send(json.dumps(msg)))
+            except RuntimeError:
+                # called from a listener thread: use call_soon_threadsafe
+                asyncio.get_event_loop().call_soon_threadsafe(out_q.put_nowait, msg)
+
         kb_listener = keyboard.Listener(on_press=on_press, on_release=on_release)
         kb_listener.start()
         mouse_listener = mouse.Listener(on_click=on_click)
         mouse_listener.start()
+
+        async def send_outgoing():
+            while True:
+                msg = await out_q.get()
+                try:
+                    await ws.send(json.dumps(msg))
+                except Exception:
+                    pass
+
+        send_task = asyncio.create_task(send_outgoing())
 
         try:
             while True:
@@ -98,13 +120,10 @@ async def run_master(host, port, edge_threshold=2, poll_interval=0.016):
                     msg = {"type": "mousemove", "dx": dx, "dy": dy}
                     await ws.send(json.dumps(msg))
 
-                # check for incoming release messages
+                # check for incoming release messages using a short timeout
                 try:
-                    # non-blocking recv
-                    recv_task = asyncio.create_task(ws.recv())
-                    done, pending = await asyncio.wait([recv_task], timeout=0, return_when=asyncio.ALL_COMPLETED)
-                    if recv_task in done:
-                        data = recv_task.result()
+                    data = await asyncio.wait_for(ws.recv(), timeout=0.01)
+                    if data is not None:
                         try:
                             m = json.loads(data)
                             if m.get('type') == 'release':
@@ -112,9 +131,18 @@ async def run_master(host, port, edge_threshold=2, poll_interval=0.016):
                                 print('[master] control returned from slave')
                         except Exception:
                             pass
-                except Exception:
-                    # nothing to read
+                except asyncio.TimeoutError:
                     pass
+                except websockets.ConnectionClosed as e:
+                    # log close code and reason to help diagnose
+                    try:
+                        code = e.code
+                        reason = e.reason
+                    except Exception:
+                        code = None
+                        reason = None
+                    print(f"[master] connection closed by slave (code={code}, reason={reason})")
+                    break
 
                 await asyncio.sleep(poll_interval)
         except KeyboardInterrupt:
@@ -123,6 +151,7 @@ async def run_master(host, port, edge_threshold=2, poll_interval=0.016):
             if kb_listener:
                 kb_listener.stop()
             mouse_listener.stop()
+            send_task.cancel()
 
 
 def main():
