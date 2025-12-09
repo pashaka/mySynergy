@@ -20,6 +20,20 @@ try:
 except Exception:
     pyautogui = None
 
+import websockets
+
+
+class SlaveServer:
+    def __init__(self, port):
+        self.port = port
+        self.mouse_ctrl = mouse.Controller()
+        self.keyboard_ctrl = keyboard.Controller()
+        self.controlling = False
+        self.ws = None
+
+    async def handler(self, websocket, path):
+        print(f"[slave] master connected")
+        self.ws = websocket
         try:
             async for raw in websocket:
                 try:
@@ -53,26 +67,6 @@ except Exception:
                             'middle': mouse.Button.middle
                         }
                         b = btn_map.get(btn, mouse.Button.left)
-                        if down:
-                            self.mouse_ctrl.press(b)
-                        else:
-                            self.mouse_ctrl.release(b)
-                    elif t == 'keydown' and self.controlling:
-                        k = msg.get('key')
-                        self._press_key(k, down=True)
-                    elif t == 'keyup' and self.controlling:
-                        k = msg.get('key')
-                        self._press_key(k, down=False)
-                except Exception:
-                    import traceback
-                    print('[slave] error while handling message:')
-                    traceback.print_exc()
-
-        except websockets.ConnectionClosed:
-            print('[slave] master disconnected')
-        finally:
-            self.ws = None
-            self.controlling = False
                         if down:
                             self.mouse_ctrl.press(b)
                         else:
