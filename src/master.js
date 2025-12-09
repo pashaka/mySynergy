@@ -1,6 +1,18 @@
 #!/usr/bin/env node
 const WebSocket = require('ws');
-const robot = require('robotjs');
+let robot;
+try {
+  robot = require('robotjs');
+} catch (e) {
+  console.error('\n[master] Error: `robotjs` is not installed or failed to load.');
+  console.error('[master] robotjs is required on the master to read the local mouse position.');
+  console.error('[master] On macOS you may need Xcode Command Line Tools and to build native modules.');
+  console.error('[master] Suggested steps:');
+  console.error('  1) Install Xcode CLI: `xcode-select --install`');
+  console.error('  2) Install node-gyp prerequisites (Python, etc.) and ensure `node` and `npm` are up-to-date.');
+  console.error('  3) From the project directory run: `npm install --build-from-source robotjs`');
+  process.exit(1);
+}
 
 let iohook;
 try {

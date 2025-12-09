@@ -8,9 +8,11 @@
     "start:slave": "node src/slave.js"
   },
   "dependencies": {
-    "ws": "^8.13.0",
-    "robotjs": "^0.6.0",
-    "iohook": "^0.9.3"
+    "ws": "^8.13.0"
+  },
+  "optionalDependencies": {
+    "iohook": "^0.9.3",
+    "robotjs": "^0.6.0"
   },
   "engines": {
     "node": ">=14"

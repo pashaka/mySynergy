@@ -1,6 +1,18 @@
 #!/usr/bin/env node
 const WebSocket = require('ws');
-const robot = require('robotjs');
+let robot;
+try {
+  robot = require('robotjs');
+} catch (e) {
+  console.error('\n[slave] Error: `robotjs` is not installed or failed to load.');
+  console.error('[slave] On macOS you may need Xcode Command Line Tools and to build native modules.');
+  console.error('[slave] Suggested steps:');
+  console.error('  1) Install Xcode CLI: `xcode-select --install`');
+  console.error('  2) Install node-gyp prerequisites (Python, etc.) and ensure `node` and `npm` are up-to-date.');
+  console.error('  3) From the project directory run: `npm install --build-from-source robotjs`');
+  console.error('If you prefer avoiding native modules, I can adapt this project to use `cliclick` (brew install cliclick) as a fallback.');
+  process.exit(1);
+}
 
 const args = process.argv.slice(2);
 const port = parseInt(args[0], 10) || 8080;
